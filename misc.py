@@ -8,13 +8,15 @@ Type end on it's own line when you're finished, or type reset to enter the keyva
 You can type end by its self if you have nothing to enter.
 
 
-Syntax: <key> [value] [tag] [comment] ["block"]
+Syntax: ["-"] <key> [value] [tag] [comment] ["block"]
 Usage Notes:
+    Key is the only required parameter.
     If you want to specify a term but don't want to fill out the ones before it, type None for them.
     E.g: <key> None None // my comment
 
     The block parameter tells the program that this is a block and you want to enter additional keyvalues.
-    
+    The - parameter tells the program that you DON'T want this keyvalue in your results.
+    (Make sure there's a space between - and the key.)
 
 Examples:
 ------------------------------------------
@@ -232,7 +234,7 @@ class Block:
 
 
 class KeyValue:
-    def __init__(self, key, value, tag=None, comment=None):
+    def __init__(self, key, value, tag=None, comment=None, negated=False):
         self.key = key
 
         if value == "None":
@@ -248,6 +250,8 @@ class KeyValue:
         elif comment and "//" not in comment:
             comment = "// " + comment
         self.comment = comment
+        
+        self.negated = negated # Negated is only taken into account when querying for blocks to modify
 
     # Check if two keyvalues are strictly equal, block values must be exactly the same
     def equals(self, keyvalue):
@@ -331,14 +335,28 @@ def findValidTags(line, tag):
                     tag_index += 1
 
     return indexes
+
+
+# Return whether or not all of keyvalues are not in source
+def keyValuesNotIn(source, keyvalues):
+    for kv1 in source:
+        for kv2 in keyvalues:
+
+            # Note: no recursion into sub blocks, only return False if the current block has keyvalues
+            if kv1.equals(kv2):
+                return False
+
+    return True
     
-"""
-    Return whether or not all of keyvalues are in source
-    If keyvalues is empty, return true (it doesn't matter what's inside source)
-    This function is used to match user queries to blocks,
-    so if keyvalues is empty all that needs to match is the block names (which is checked elsewhere)
-"""
+    
+# Return whether or not all of keyvalues are in source
 def keyValuesIn(source, keyvalues):
+    negated   = [kv for kv in keyvalues if kv.negated]
+    keyvalues = [kv for kv in keyvalues if not kv.negated]
+
+    if not keyValuesNotIn(source, negated):
+        return False
+    
     # Length checks before we commit to ludicrously lengthy looping (not really, but alliteration is fun)
     if len(keyvalues) > len(source):
         return False
@@ -671,23 +689,38 @@ def getKeyValues(prompt, allow_only_key=True):
         keyvalues = keyvalues.split('\n')
         keyvalues = [parseLineTerms(line) for line in keyvalues]
 
-        block_indexes = []
+        block_indexes   = []
+        negated_indexes = []
+        invalid_input   = False
+        
         for index, kv in enumerate(keyvalues):
+            if kv[0] == '-':
+                if len(kv) > 1:
+                    negated_indexes.append(index)
+                    keyvalues[index] = kv[1:]
+                else:
+                    print("\nInvalid input.\n")
+                    invalid_input = True
+                    break
+            
             if '"block"' in kv:
                 keyvalues[index] = kv[:-1]
                 block_indexes.append(index)
             else:
-                # Is comment defined
-                if len(kv) == 4:
-                    comment = kv[-1]
+                # There is a comment
+                if len(kv) >= 4:
+                    comment = kv[3]
                     
                     if '"block"' in comment:
                         found_index = comment.rfind('"block"')
                         comment = comment[:found_index]
                         comment = comment.rstrip()
 
-                        keyvalues[index][-1] = comment
-                        block_indexes.append(index)          
+                        keyvalues[index][3] = comment
+                        block_indexes.append(index)
+                        
+        if invalid_input:
+            continue
 
         if allow_only_key:
             if any(map(lambda kv: len(kv) < 1 or len(kv) > 4, keyvalues)):
@@ -710,6 +743,10 @@ def getKeyValues(prompt, allow_only_key=True):
                 kv = keyvalues[index]
                 prompt = f"\n{kv.key}\n{'-'*len(kv.key)}\nEnter the keyvalues the block has."
                 kv.value = Block(None, kv.key, getKeyValues(prompt), kv.tag, kv.comment)
+                
+        if negated_indexes:
+            for index in negated_indexes:
+                keyvalues[index].negated = True
 
         return keyvalues
 
