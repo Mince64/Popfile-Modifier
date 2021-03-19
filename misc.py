@@ -40,6 +40,17 @@ AddCond None [$SIGSEGV] None "block"
 CharacterAttributes None None // These are two are blocks "block"
 end
 ------------------------------------------
+
+------------------------------------------
+Class Demoman
+- WeaponRestrictions
+------------------------------------------
+
+------------------------------------------
+Class
+- Class Scout
+- Class Spy
+------------------------------------------
 """
 
 
