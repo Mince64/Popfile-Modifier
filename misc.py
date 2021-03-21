@@ -11,12 +11,13 @@ You can type end by its self if you have nothing to enter.
 Syntax: ["-"] <key> [value] [tag] [comment] ["block"]
 Usage Notes:
     Key is the only required parameter.
-    If you want to specify a term but don't want to fill out the ones before it, type None for them.
+    If you want to specify a parameter but don't want to fill out the ones before it, type None for them.
     E.g: <key> None None // my comment
 
     The block parameter tells the program that this is a block and you want to enter additional keyvalues.
     The - parameter tells the program that you DON'T want this keyvalue in your results.
     (Make sure there's a space between - and the key.)
+    
 
 Examples:
 ------------------------------------------
@@ -242,8 +243,12 @@ class Block:
                     if isinstance(kv2.value, Block):
                         createParentStructure(self, kv2.value)
                 
-                self.add(keyvalues)                
+                self.add(keyvalues)
 
+
+    # Use KeyValue.equals to compare blocks
+    def equals(self, block, nocomment=False):
+        return KeyValue("", self).equals(KeyValue("", block), nocomment)
 
 
 class KeyValue:
@@ -263,11 +268,33 @@ class KeyValue:
         elif comment and "//" not in comment:
             comment = "// " + comment
         self.comment = comment
-        
+
         self.negated = negated # Negated is only taken into account when querying for blocks to modify
 
+    def __str__(self):
+        string = self.key
+
+        if self.key != "//":
+            string += " "
+
+        if self.value:
+            string += str(self.value)
+                
+        if self.tag:
+            string += " " + self.tag
+                    
+        if self.comment:
+            string += " " + self.comment
+
+        return string
+
+    
     # Check if two keyvalues are strictly equal, block values must be exactly the same
-    def equals(self, keyvalue):
+    def equals(self, keyvalue, nocomments=False):
+        if nocomments:
+            if self.key == "//" or keyvalue.key == "//":
+                return True
+            
         kvs1 = [self.key, self.value, self.tag]
         kvs2 = [keyvalue.key, keyvalue.value, keyvalue.tag]
 
@@ -281,23 +308,32 @@ class KeyValue:
 
         for j, k in zip(kvs1, kvs2):
             if isinstance(j, Block) and isinstance(k, Block):
-                if len(j.keyvalues) != len(k.keyvalues) or j.name != k.name:
+                jkvs = j.keyvalues
+                kkvs = k.keyvalues
+                
+                if nocomments:
+                    jkvs = [kv for kv in jkvs if kv.key != "//"]
+                    kkvs = [kv for kv in kkvs if kv.key != "//"]
+                
+                if len(jkvs) != len(kkvs) or j.name != k.name:
+                    return False
+                
+                temp = copy.deepcopy(kkvs)
+
+                # Remove keyvalues that match from temp
+                for kv1 in jkvs:
+                    for kv2 in temp:
+                        if kv1.key == kv2.key:
+                            if kv1.equals(kv2, nocomments):
+                                temp.remove(kv2)
+
+                            break
+
+                # If it's empty they're the same
+                if temp:
                     return False
                 else:
-                    temp = copy.deepcopy(k.keyvalues)
-
-                    # Remove keyvalues that match from temp
-                    for kv1 in j.keyvalues:
-                        for kv2 in temp:
-                            if kv1.equals(kv2):
-                                temp.remove(kv2)
-                                break
-
-                    # If it's empty they're the same
-                    if temp:
-                        return False
-                    else:
-                        return True
+                    return True
                                 
             else:
                 if j != k:
@@ -361,7 +397,7 @@ def keyValuesNotIn(source, keyvalues):
 
     return True
     
-    
+
 # Return whether or not all of keyvalues are in source
 def keyValuesIn(source, keyvalues):
     negated   = [kv for kv in keyvalues if kv.negated]
@@ -375,7 +411,7 @@ def keyValuesIn(source, keyvalues):
         return False
     elif not len(keyvalues):
         return True
-    
+
     keyvalues = copy.deepcopy(keyvalues)
 
     # Remove from keyvalues if they match with source
@@ -692,6 +728,7 @@ def parseLineTerms(line):
 # Prompt user for keyvalues
 def getKeyValues(prompt, allow_only_key=True):
     keyvalues = []
+    
     while True:
         keyvalues = getMultiInput(prompt, ["end"], help_text=help_text_keyvalues)
         print("")
@@ -705,7 +742,7 @@ def getKeyValues(prompt, allow_only_key=True):
         block_indexes   = []
         negated_indexes = []
         invalid_input   = False
-        
+
         for index, kv in enumerate(keyvalues):
             if kv[0] == '-':
                 if len(kv) > 1:
@@ -715,7 +752,7 @@ def getKeyValues(prompt, allow_only_key=True):
                     print("\nInvalid input.\n")
                     invalid_input = True
                     break
-            
+                    
             if '"block"' in kv:
                 keyvalues[index] = kv[:-1]
                 block_indexes.append(index)
@@ -723,6 +760,7 @@ def getKeyValues(prompt, allow_only_key=True):
                 # There is a comment
                 if len(kv) >= 4:
                     comment = kv[3]
+                        
                     
                     if '"block"' in comment:
                         found_index = comment.rfind('"block"')
@@ -756,10 +794,11 @@ def getKeyValues(prompt, allow_only_key=True):
                 kv = keyvalues[index]
                 prompt = f"\n{kv.key}\n{'-'*len(kv.key)}\nEnter the keyvalues the block has."
                 kv.value = Block(None, kv.key, getKeyValues(prompt), kv.tag, kv.comment)
-                
+
         if negated_indexes:
             for index in negated_indexes:
                 keyvalues[index].negated = True
+                
 
         return keyvalues
 
@@ -806,6 +845,3 @@ def validateWildString(inp):
 
 if __name__ == "__main__":
     pass
-
-    
-        
