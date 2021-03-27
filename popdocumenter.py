@@ -3,6 +3,8 @@ import collections
 from string import whitespace
 from misc import *
 
+
+# Modify keyvalues in modified_keyvalues with old base values if they are different
 def modifyWithDifferences(modified_keyvalues, base_keyvalues):
     def keyvalueInList(keyvalue, keyvalues):
         for kv in keyvalues:
@@ -10,7 +12,8 @@ def modifyWithDifferences(modified_keyvalues, base_keyvalues):
                 return True
         else:
             return False
-                                
+
+    # Add commented out keyvalues to modified keyvalues if they exist in the base but not the modified          
     for kv2 in base_keyvalues:
         if not keyvalueInList(kv2, modified_keyvalues):
             for kv1 in modified_keyvalues:
@@ -18,15 +21,18 @@ def modifyWithDifferences(modified_keyvalues, base_keyvalues):
                     if isinstance(kv1.value, str) and kv1.value.count(kv2.key):
                         break
             else:
-                modified_keyvalues.append(KeyValue("//", kv2.key + " " + kv2.value))
-                                           
+                modified_keyvalues.append(KeyValue("// ", kv2.key + " " + kv2.value))
+
+    # Change values in modified to <old base value> --> <new value> if different from base           
     for kv1 in modified_keyvalues:
         if kv1.key != "//":
             for kv2 in base_keyvalues:
                 if kv1.key == kv2.key and not kv1.equals(kv2):
                      kv1.value = kv2.value  + " --> " + kv1.value
+                     break
 
 
+# Get a keyvalue in a block
 def getBlockKeyValue(block, keyvalue):
     if isinstance(block, Block):
         for kv in block.keyvalues:
@@ -206,7 +212,7 @@ while True:
                             file_obj_playerupgrades = None
 
 
-                        # Remove keyvalues that are the same as default
+                        # Remove upgrade blocks that are the same as default
                         for obj1, obj2 in zip([file_obj_itemupgrades, file_obj_playerupgrades],
                                               [upgrades_itemupgrades, upgrades_playerupgrades]):
                             if obj1:
@@ -274,7 +280,7 @@ while True:
         
     os.chdir(savedir)
     
-    # write to files
+    # Write to files
     i = 0
     for findex, string in zip(file_indexes, write_strings):
         name = popfiles[findex - 1]
