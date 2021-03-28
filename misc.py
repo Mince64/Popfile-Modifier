@@ -8,15 +8,26 @@ Type end on it's own line when you're finished, or type reset to enter the keyva
 You can type end by its self if you have nothing to enter.
 
 
-Syntax: ["-"] <key> [value] [tag] [comment] ["block"]
+Syntax: [modifiers] <key> [value] [tag] [comment] ["block"]
 Usage Notes:
     Key is the only required parameter.
     If you want to specify a parameter but don't want to fill out the ones before it, type None for them.
     E.g: <key> None None // my comment
 
+    Key and value may have a wildcard in them.
+
     The block parameter tells the program that this is a block and you want to enter additional keyvalues.
-    The - parameter tells the program that you DON'T want this keyvalue in your results.
-    (Make sure there's a space between - and the key.)
+
+    The modifiers parameter is a string of characters that modify how the keyvalue is interpreted:
+        i :: Case insensitive
+
+        Pick one:
+            -  :: This keyvalue should not exist in returned blocks
+            ~  :: Atleast one of all keyvalues with this flag should exist
+
+    Example:
+        i- Class Scout None // Bonk!
+
     
 
 Examples:
@@ -54,7 +65,33 @@ Class
 - Class Spy
 end
 ------------------------------------------
+
+------------------------------------------
+i item "duel medal bronze"
+~ Class Scout*
+~ Class Soldier*
+end
+------------------------------------------
 """
+
+
+# Check if a string with a wildcard and a regular string are equal
+def areWildNamesEqual(wildcard_name, name, case_sensitive=True):
+    if not case_sensitive:
+        wildcard_name = wildcard_name.lower()
+        name          = name.lower()
+                
+    if '*' not in wildcard_name:
+        if wildcard_name == name:
+            return True
+        else:
+            return False
+    else:
+        terms = wildcard_name.split('*')
+        if name.startswith(terms[0]) and name.endswith(terms[-1]):
+            return True
+        else:
+            return False
 
 
 
@@ -134,27 +171,13 @@ class Block:
     # Return a list of matching child blocks filtered by arguments
     def queryChildren(self, name, keyvalues=[], parent_name=None, parent_keyvalues=[], recurse=True):     
         filtered_blocks = []
-
-        # Check if a string with a wildcard and a regular string are equal
-        def areNamesEqual(wildcard_name, name):        
-            if '*' not in wildcard_name:
-                if wildcard_name == name:
-                    return True
-                else:
-                    return False
-            else:
-                terms = wildcard_name.split('*')
-                if name.startswith(terms[0]) and name.endswith(terms[-1]):
-                    return True
-                else:
-                    return False
         
         # First find all initial blocks with name
         for kv in self.keyvalues:
             if isinstance(kv.value, Block):
                 block = kv.value
                 
-                if areNamesEqual(name, block.name):
+                if areWildNamesEqual(name, block.name):
                     filtered_blocks.append(block)
                     
                 if recurse:
@@ -168,7 +191,7 @@ class Block:
             
             for block in filtered_blocks:
                 if block.parent:
-                    if areNamesEqual(parent_name, block.parent.name):
+                    if areWildNamesEqual(parent_name, block.parent.name):
                         filter_list.append(block)
 
             filtered_blocks = filter_list[:]
@@ -252,7 +275,7 @@ class Block:
 
 
 class KeyValue:
-    def __init__(self, key, value, tag=None, comment=None, negated=False):
+    def __init__(self, key, value, tag=None, comment=None, flags=""):
         self.key = key
 
         if value == "None":
@@ -269,20 +292,18 @@ class KeyValue:
             comment = "// " + comment
         self.comment = comment
 
-        self.negated = negated # Negated is only taken into account when querying for blocks to modify
+        # Only taken into account when querying for blocks to modify
+        self.flags = flags
 
     def __str__(self):
         string = self.key
 
         if self.key != "//":
             string += " "
-
         if self.value:
-            string += str(self.value)
-                
+            string += str(self.value)               
         if self.tag:
-            string += " " + self.tag
-                    
+            string += " " + self.tag                 
         if self.comment:
             string += " " + self.comment
 
@@ -298,13 +319,20 @@ class KeyValue:
         kvs1 = [self.key, self.value, self.tag]
         kvs2 = [keyvalue.key, keyvalue.value, keyvalue.tag]
 
+        if "i" in self.flags or "i" in keyvalue.flags:
+            kvs1 = [term.lower() if isinstance(term, str) else term for term in kvs1]
+            kvs2 = [term.lower() if isinstance(term, str) else term for term in kvs2]
+
+
         # Don't compare values or tags if one of them doesn't exist
-        if not keyvalue.value or not self.value:
-            kvs1.remove(self.value)
-            kvs2.remove(keyvalue.value)
-        if not keyvalue.tag or not self.tag:
-            kvs1.remove(self.tag)
-            kvs2.remove(keyvalue.tag)
+        for term in kvs1[1:]:
+            if not term:
+                kvs1.remove(term)
+
+        for term in kvs2[1:]:
+            if not term:
+                kvs2.remove(term)
+            
 
         for j, k in zip(kvs1, kvs2):
             if isinstance(j, Block) and isinstance(k, Block):
@@ -336,7 +364,7 @@ class KeyValue:
                     return True
                                 
             else:
-                if j != k:
+                if not areWildNamesEqual(k, j):
                     return False
 
         return True
@@ -400,8 +428,8 @@ def keyValuesNotIn(source, keyvalues):
 
 # Return whether or not all of keyvalues are in source
 def keyValuesIn(source, keyvalues):
-    negated   = [kv for kv in keyvalues if kv.negated]
-    keyvalues = [kv for kv in keyvalues if not kv.negated]
+    negated   = [kv for kv in keyvalues if "-" in kv.flags]
+    keyvalues = [kv for kv in keyvalues if kv not in negated]
 
     if not keyValuesNotIn(source, negated):
         return False
@@ -412,21 +440,47 @@ def keyValuesIn(source, keyvalues):
     elif not len(keyvalues):
         return True
 
-    keyvalues = copy.deepcopy(keyvalues)
+    keyvalues      = copy.deepcopy(keyvalues)
+    optional_found = False
 
     # Remove from keyvalues if they match with source
     for kv1 in source:
         for kv2 in keyvalues:
-            if isinstance(kv1.value, Block):
-                if kv1.key == kv2.key: # Are block names the same
-                    if keyValuesIn(kv1.value.keyvalues, kv2.value.keyvalues):
+            try:
+                if isinstance(kv1.value, Block):
+                    if optional_found and "~" in kv2.flags:
                         keyvalues.remove(kv2)
-                        
-            else:
-                if kv1.equals(kv2):
-                    keyvalues.remove(kv2)
+                        continue
+                    
+                    if kv1.key == kv2.key: # Are block names the same
+                        if keyValuesIn(kv1.value.keyvalues, kv2.value.keyvalues):
+                            if "~" in kv2.flags:
+                                optional_found = True
+                                
+                            keyvalues.remove(kv2)
+                            
+                else:
+                    if kv1.equals(kv2):
+                        if "~" in kv2.flags:
+                            optional_found = True
+                            
+                        keyvalues.remove(kv2)
 
-    # If it's empty all of keyvalues are in source
+            except AttributeError:
+                print(type(source), type(keyvalues))
+                print(type(kv1), type(kv2))
+                print(kv1)
+                print(kv2)
+                print(kv2.key, kv2.value, kv2.tag, kv2.comment, kv2.flags)
+                raise AttributeError
+                    
+    # Remove any optional keyvalues that didn't match after finding one later
+    if optional_found:
+        for kv in keyvalues:
+            if "~" in kv.flags:
+                keyvalues.remove(kv)
+
+                
     if keyvalues:
         return False
     else:
@@ -453,7 +507,7 @@ def parsePopFile(filepath):
         current_block = populator
         
         for line in file:
-            
+
             # Allow the whitespace logic to always run at the end of a line
             if line[-1] not in string.whitespace:
                 line += "\n"
@@ -740,19 +794,36 @@ def getKeyValues(prompt, allow_only_key=True):
         keyvalues = [parseLineTerms(line) for line in keyvalues]
 
         block_indexes   = []
-        negated_indexes = []
+        flagged_indexes = {}
         invalid_input   = False
 
         for index, kv in enumerate(keyvalues):
-            if kv[0] == '-':
+
+            # Is there a flag string at the beginning?
+            non_flag_chars = [ch for ch in string.printable if ch not in "i-~"]
+            for char in kv[0]:
+                if char in non_flag_chars:
+                    break
+            else:
                 if len(kv) > 1:
-                    negated_indexes.append(index)
-                    keyvalues[index] = kv[1:]
+                    count = 0
+                    for ch in "-~":
+                        if ch in kv[0]:
+                            count += 1
+
+                    if count > 1:
+                        print("\nInvalid input.\n")
+                        invalid_input = True
+                        break
+
+                    flagged_indexes[index] = kv[0]
+                    keyvalues[index]       = kv[1:]
                 else:
                     print("\nInvalid input.\n")
                     invalid_input = True
-                    break
-                    
+                    break                    
+
+
             if '"block"' in kv:
                 keyvalues[index] = kv[:-1]
                 block_indexes.append(index)
@@ -774,14 +845,14 @@ def getKeyValues(prompt, allow_only_key=True):
             continue
 
         if allow_only_key:
-            if any(map(lambda kv: len(kv) < 1 or len(kv) > 4, keyvalues)):
+            if any(map(lambda kv: len(kv) < 1 or len(kv) > 5, keyvalues)):
                 print("\nInvalid input.\n")
                 continue
             
             else:
                 keyvalues = [KeyValue(*kv) if len(kv) > 1 and kv[1] else KeyValue(*kv, value=None) for kv in keyvalues]
         else:
-            if any(map(lambda kv: len(kv) < 2 or len(kv) > 4, keyvalues)):
+            if any(map(lambda kv: len(kv) < 2 or len(kv) > 5, keyvalues)):
                 print("\nInvalid input\n")
                 continue
             
@@ -795,10 +866,9 @@ def getKeyValues(prompt, allow_only_key=True):
                 prompt = f"\n{kv.key}\n{'-'*len(kv.key)}\nEnter the keyvalues the block has."
                 kv.value = Block(None, kv.key, getKeyValues(prompt), kv.tag, kv.comment)
 
-        if negated_indexes:
-            for index in negated_indexes:
-                keyvalues[index].negated = True
-                
+        if flagged_indexes:
+            for index, flag in flagged_indexes.items():
+                keyvalues[index].flags = flag
 
         return keyvalues
 
@@ -845,3 +915,6 @@ def validateWildString(inp):
 
 if __name__ == "__main__":
     pass
+
+    
+        
