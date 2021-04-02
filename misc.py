@@ -169,7 +169,7 @@ class Block:
 
 
     # Return a list of matching child blocks filtered by arguments
-    def queryChildren(self, name, keyvalues=[], parent_name=None, parent_keyvalues=[], recurse=True):     
+    def queryChildren(self, name, keyvalues=[], parent_name=None, parent_keyvalues=[], recurse=True, case_sensitive_names=True):
         filtered_blocks = []
         
         # First find all initial blocks with name
@@ -177,7 +177,7 @@ class Block:
             if isinstance(kv.value, Block):
                 block = kv.value
                 
-                if areWildNamesEqual(name, block.name):
+                if areWildNamesEqual(name, block.name, case_sensitive_names):
                     filtered_blocks.append(block)
                     
                 if recurse:
@@ -191,7 +191,7 @@ class Block:
             
             for block in filtered_blocks:
                 if block.parent:
-                    if areWildNamesEqual(parent_name, block.parent.name):
+                    if areWildNamesEqual(parent_name, block.parent.name, case_sensitive_names):
                         filter_list.append(block)
 
             filtered_blocks = filter_list[:]
@@ -274,6 +274,19 @@ class Block:
         return KeyValue("", self).equals(KeyValue("", block), nocomment)
 
 
+    # Get the WaveSchedule object of a base block
+    def getWaveSchedule(self):
+        if not self.is_base:
+            return None
+
+        for kv in self.keyvalues:
+            if isinstance(kv.value, Block):
+                return kv.value
+
+        return None
+
+
+
 class KeyValue:
     def __init__(self, key, value, tag=None, comment=None, flags=""):
         self.key = key
@@ -322,6 +335,10 @@ class KeyValue:
         if "i" in self.flags or "i" in keyvalue.flags:
             kvs1 = [term.lower() if isinstance(term, str) else term for term in kvs1]
             kvs2 = [term.lower() if isinstance(term, str) else term for term in kvs2]
+
+        if "q" in self.flags or "q" in keyvalue.flags:
+            kvs1 = [term.replace('"', "") if isinstance(term, str) else term for term in kvs1]
+            kvs2 = [term.replace('"', "") if isinstance(term, str) else term for term in kvs2]
 
 
         # Don't compare values or tags if one of them doesn't exist
@@ -411,6 +428,9 @@ def findValidTags(line, tag):
                 else:
                     tag_index += 1
 
+            else:
+                tag_index = 0
+
     return indexes
 
 
@@ -435,7 +455,7 @@ def keyValuesIn(source, keyvalues):
         return False
     
     # Length checks before we commit to ludicrously lengthy looping (not really, but alliteration is fun)
-    if len(keyvalues) > len(source):
+    if len([kv for kv in keyvalues if "~" not in kv.flags]) > len(source):
         return False
     elif not len(keyvalues):
         return True
@@ -446,40 +466,31 @@ def keyValuesIn(source, keyvalues):
     # Remove from keyvalues if they match with source
     for kv1 in source:
         for kv2 in keyvalues:
-            try:
-                if isinstance(kv1.value, Block):
-                    if optional_found and "~" in kv2.flags:
-                        keyvalues.remove(kv2)
-                        continue
+            if isinstance(kv1.value, Block):
+                if optional_found and "~" in kv2.flags:
+                    keyvalues.remove(kv2)
+                    continue
                     
-                    if kv1.key == kv2.key: # Are block names the same
-                        if keyValuesIn(kv1.value.keyvalues, kv2.value.keyvalues):
-                            if "~" in kv2.flags:
-                                optional_found = True
-                                
-                            keyvalues.remove(kv2)
-                            
-                else:
-                    if kv1.equals(kv2):
+                if kv1.key == kv2.key: # Are block names the same
+                    if keyValuesIn(kv1.value.keyvalues, kv2.value.keyvalues):
                         if "~" in kv2.flags:
                             optional_found = True
-                            
+                                
                         keyvalues.remove(kv2)
+                            
+            else:
+                if kv1.equals(kv2):
+                    if "~" in kv2.flags:
+                        optional_found = True
+                            
+                    keyvalues.remove(kv2)
 
-            except AttributeError:
-                print(type(source), type(keyvalues))
-                print(type(kv1), type(kv2))
-                print(kv1)
-                print(kv2)
-                print(kv2.key, kv2.value, kv2.tag, kv2.comment, kv2.flags)
-                raise AttributeError
                     
     # Remove any optional keyvalues that didn't match after finding one later
     if optional_found:
-        for kv in keyvalues:
+        for kv in keyvalues[:]:
             if "~" in kv.flags:
                 keyvalues.remove(kv)
-
                 
     if keyvalues:
         return False
@@ -507,7 +518,6 @@ def parsePopFile(filepath):
         current_block = populator
         
         for line in file:
-
             # Allow the whitespace logic to always run at the end of a line
             if line[-1] not in string.whitespace:
                 line += "\n"
@@ -573,6 +583,11 @@ def parsePopFile(filepath):
                     
                     if char == '"':
                         in_string = True if not in_string else False
+
+                        # Check for a term right next to this string
+                        if index != len(line) - 1 and not in_string:
+                            if line[index + 1] not in string.whitespace:
+                                end_term = True
 
 
                 elif char in string.whitespace:
