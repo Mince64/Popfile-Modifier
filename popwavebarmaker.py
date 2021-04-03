@@ -460,17 +460,27 @@ def getTFBotIconString(tfbot, wave_icon_dict, templates, totalcount, support, no
 
     if support:
         try:
-            wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
+            # If one icon or the other has crits, don't stack and create a separate icon.
+            if wave_icon_dict["support"][classicon][1] ^ hascrits:
+                wave_icon_dict["support"][classicon + "\0"] = [totalcount, hascrits] # We'll deal with that null char later, this is just to seperate the two
+            else:
+                wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
         except KeyError:
             wave_icon_dict["support"][classicon] = [totalcount, hascrits]
     elif miniboss:
         try:
-            wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
+            if wave_icon_dict["giant"][classicon][1] ^ hascrits:
+                wave_icon_dict["giant"][classicon + "\0"] = [totalcount, hascrits]
+            else:
+                wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
         except KeyError:
             wave_icon_dict["giant"][classicon] = [totalcount, hascrits]
     else:
         try:
-            wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
+            if wave_icon_dict["normal"][classicon][1] ^ hascrits:
+                wave_icon_dict["normal"][classicon + "\0"] = [totalcount, hascrits]
+            else:
+                wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
         except KeyError:
             wave_icon_dict["normal"][classicon] = [totalcount, hascrits]
 
@@ -480,8 +490,10 @@ def getTFBotIconString(tfbot, wave_icon_dict, templates, totalcount, support, no
                 
     for icon, data in wave_icon_dict["normal"].items():
         if icon in newicons["giant"]:
-            newicons["giant"][icon] = [data[0] + newicons["giant"][icon][0], data[1] if data[1] else newicons["giant"][icon][1]]
-            del newicons["normal"][icon]
+            # Only stack if our hascrits are the same
+            if newicons["giant"][icon][1] and data[1]:
+                newicons["giant"][icon] = [data[0] + newicons["giant"][icon][0], data[1] if data[1] else newicons["giant"][icon][1]]
+                del newicons["normal"][icon]
 
     for group in wave_icon_dict.keys():
         wave_icon_dict[group] = newicons[group]
@@ -719,10 +731,18 @@ while True:
         print(f"Generating wavebar for {popfiles[fileindex - 1]} ...\n")
 
         templates = getTemplates(obj, popfilesdir, popfiles[fileindex - 1], notify_warnings=notify_warnings)
-        templates = { template.name.lower() : template for template in templates }
+        if templates:
+            templates = { template.name.lower() : template for template in templates }
         
         iconstrings = []
-        waves       = obj.getWaveSchedule().queryChildren("Wave", recurse=False, case_sensitive_names=False)
+        
+        waveschedule = obj.getWaveSchedule()
+        if not waveschedule:
+            print("ERROR: Popfile contains no waveschedule.")
+            input()
+            sys.exit(0)
+        
+        waves = waveschedule.queryChildren("Wave", recurse=False, case_sensitive_names=False)
 
         if not waves:
             if notify_warnings:
@@ -819,6 +839,7 @@ while True:
                                     continue
 
                                 notified = False
+                                totalcount_left = totalcount
                                 for block in blocks:
                                     if block.name.lower() == "tfbot":
                                         count = 0
@@ -828,9 +849,12 @@ while True:
                                         if not count:
                                             if notify_warnings and not notified:
                                                 notified = True
-                                                print("WARNING: Squad has higher number of TFBot blocks than TotalCount, it will not be displayed.")
+                                                print("WARNING: Squad has higher number of TFBot blocks than TotalCount, some bots will not be displayed.")
                                                 print(spawner)
 
+                                            if totalcount_left:
+                                                totalcount_left -= 1
+                                                count = 1
 
                                         getTFBotIconString(block, iconstrings[index], templates, count, support, notify_warnings)
                                             
@@ -920,6 +944,7 @@ while True:
                         continue
 
                     notified = False
+                    totalcount_left = totalcount
                     for block in blocks:
                         if block.name.lower() == "tfbot":
                             count = 0
@@ -929,8 +954,12 @@ while True:
                             if not count:
                                 if notify_warnings and not notified:
                                     notified = True
-                                    print("WARNING: Squad has higher number of TFBot blocks than TotalCount, it will not be displayed.")
+                                    print("WARNING: Squad has higher number of TFBot blocks than TotalCount, some bots will not be displayed.")
                                     print(spawner)
+
+                                if totalcount_left:
+                                    totalcount_left -= 1
+                                    count = 1
 
                             for w in iconstrings[wave - 1:(wave - 1) + wave_length]:
                                 getTFBotIconString(block, w, templates, count, True, notify_warnings)
@@ -986,6 +1015,13 @@ while True:
                                   }))
                 for group, icondict in wave.items():
                     for icon, data in icondict.items():
+                        duplicate_icon = False
+                        
+                        # Duplicate icon, remove our separator so we find the correct file
+                        if icon.endswith("\0"):
+                            icon = icon[:-1]
+                            duplicate_icon = True
+                            
                         os.chdir(script_path + "\\materials\\hud")
                         texturename = "debugempty"
 
@@ -1016,7 +1052,9 @@ while True:
                                 print("ERROR: images/debugempty.png missing.")
                                 input()
                                 sys.exit(0)
-                                
+
+                        if duplicate_icon:
+                            icon += "\0"
                         iconimages[index][group][icon] = [image, data]
 
 
