@@ -427,10 +427,13 @@ def createWaveScheduleBar(wave_icon_dicts, filename, totalcurrency_list, startin
         draw.text(current_pos, startingcurrency_label, font=fontlist["startingmoneyfont"], fill=fill)
     
     x = (final.width - waveschedulebar.width) // 2
-    y = current_pos[1] + mission_name_padding + margin
+    y = current_pos[1] + mission_name_padding
 
     if settings["startingmoneyenabled"]:
         y += startingcurrency_padding
+        y += startingcurrency_size[1]
+    else:
+        y += margin
     
     final.paste(waveschedulebar, (x, y))
 
@@ -757,6 +760,7 @@ def getTankIconString(tank, wave_icon_dict, templates, totalcount, support):
             wave_icon_dict["giant"][classicon] = [totalcount, False]
 
 
+# Main loop
 try:
     while True:
         pop_objs = []
