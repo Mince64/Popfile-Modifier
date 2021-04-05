@@ -1265,6 +1265,10 @@ try:
                                     os.chdir(tfdir + "\\materials\\hud")
                                     if filename in os.listdir(os.getcwd()):
                                         texturename = getVMTTexture(filename)
+                                    else:
+                                        os.chdir(tfdir + "\\download\\materials\\hud")
+                                        if filename in os.listdir(os.getcwd()):
+                                            texturename = getVMTTexture(filename)
 
                                     
                             os.chdir(script_path + "\\materials\\images")
