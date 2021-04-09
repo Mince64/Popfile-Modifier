@@ -866,7 +866,7 @@ try:
 
 
         os.chdir(script_path)
-        if not tfdir or not os.path.isdir(savedir):
+        if not tfdir or not os.path.isdir(tfdir):
             while True:
                 print("Current directory:", os.getcwd())
                 tfdir = getInput("Enter the directory path of your tf folder.", [os.path.isdir])
