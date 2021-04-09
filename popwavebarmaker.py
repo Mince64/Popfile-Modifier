@@ -772,92 +772,87 @@ try:
             popfilesdir = getInput("Enter the popfiles directory path:", [validateFileString])
             print("")
 
-        # Format it into full path
-        os.chdir(popfilesdir)
-        popfilesdir = os.getcwd()
-
-        file_indexes = []
-
-        if os.path.isfile(popfilesdir) and not os.path.isdir(popfilesdir) and popfilesdir.endswith(".pop"):
-            popfiles = [popfilesdir]
-            
-        elif os.path.isdir(popfilesdir):
+        try:
+            # Format it into full path
             os.chdir(popfilesdir)
             popfilesdir = os.getcwd()
-            
-            popfiles = [file for file in os.listdir(popfilesdir) if file.endswith(".pop")]
-            
-            print(f"Found {len(popfiles)} popfiles in {popfilesdir}")
-            for index, file in enumerate(popfiles):
-                print(f"[{index + 1}]\t{file}")
-            print("\n")
 
-            if not len(popfiles):
-                popfilesdir = ""
-                continue
-
-            while True:
-                file_indexes = []
-                raw_input = getInput("""Enter the file indexes / ranges you want to use, separated by comma:
-    (Example: 5, 7 - 9, 1) <- Selects 1, 5, 7, 8, and 9""",
-                                        [validateFileIndexes])
-
-                raw_input = raw_input.split(',')
-                for index in raw_input:
-                    if '-' not in index:
-                        file_indexes.append(int(index))
-                    else:
-                        index = ''.join([char for char in index if char not in string.whitespace])
-                        mid = index.find('-')
-                        low = int(index[:mid])
-                        high = int(index[mid+1:])
-
-                        for i in range(low, high + 1):
-                            file_indexes.append(i)
-                    
-                if not file_indexes or max(file_indexes) > len(popfiles) or min(file_indexes) < 1:
-                    print("Invalid file indexes.\n")
-                    
-                else:
-                    file_indexes.sort()
-                    print("\nYou selected these files:")
-                    for index in file_indexes:
-                        print(f"[{index}]\t{popfiles[index - 1]}")
-                    print("")
-                    
-                    raw_input = getInput("Is this correct?", [validateBoolean])
-                    print("")
-
-                    if raw_input in ["y", "ye", "yes", "1"]:
-                        break
-                    
-
-            for index in file_indexes:
-                print(f"Parsing {popfiles[index - 1]} ...")
-                try:
-                    pop_objs.append(parsePopFile(popfiles[index - 1]))
-                    
-                except (ValueError, AttributeError) as exception:
-                    print("\nERROR: Something went wrong while parsing this file.")
-                    print("Please ensure the file has proper syntax.")
-                    input()
-                    sys.exit(0)
+            file_indexes = []
                 
-                print("Finished parsing successfuly.\n")
-
-            raw_input = getInput("Would you like to see the parsed files?", [validateBoolean])
-            print("")
-
-            if raw_input in ["y", "ye", "yes", "1"]:
-                for pop in pop_objs:
-                    print(pop)
-                    raw_input = input("Press enter to continue, or type end to stop viewing.\n")
-                    if raw_input.lower() == "end":
-                        break
-
-        else:
-            print("\nInvalid input.\n")
+            popfiles = [file for file in os.listdir(popfilesdir) if file.endswith(".pop")]
+        except NotADirectoryError:
+            print("Invalid input. Input must be a valid directory, not the popfile itself.\n")
+            popfilesdir = ""
             continue
+            
+        print(f"Found {len(popfiles)} popfiles in {popfilesdir}")
+        for index, file in enumerate(popfiles):
+            print(f"[{index + 1}]\t{file}")
+        print("\n")
+
+        if not len(popfiles):
+            popfilesdir = ""
+            continue
+
+        while True:
+            file_indexes = []
+            raw_input = getInput("""Enter the file indexes / ranges you want to use, separated by comma:
+    (Example: 5, 7 - 9, 1) <- Selects 1, 5, 7, 8, and 9""",
+                                    [validateFileIndexes])
+
+            raw_input = raw_input.split(',')
+            for index in raw_input:
+                if '-' not in index:
+                    file_indexes.append(int(index))
+                else:
+                    index = ''.join([char for char in index if char not in string.whitespace])
+                    mid   = index.find('-')
+                    low   = int(index[:mid])
+                    high  = int(index[mid+1:])
+
+                    for i in range(low, high + 1):
+                        file_indexes.append(i)
+                    
+            if not file_indexes or max(file_indexes) > len(popfiles) or min(file_indexes) < 1:
+                print("Invalid file indexes.\n")
+                    
+            else:
+                file_indexes.sort()
+                print("\nYou selected these files:")
+                for index in file_indexes:
+                    print(f"[{index}]\t{popfiles[index - 1]}")
+                print("")
+                    
+                raw_input = getInput("Is this correct?", [validateBoolean])
+                print("")
+
+                if raw_input in ["y", "ye", "yes", "1"]:
+                    break
+                    
+
+        for index in file_indexes:
+            print(f"Parsing {popfiles[index - 1]} ...")
+            try:
+                pop_objs.append(parsePopFile(popfiles[index - 1]))
+                    
+            except (ValueError, AttributeError) as exception:
+                print("\nERROR: Something went wrong while parsing this file.")
+                print("Please ensure the file has proper syntax.")
+                input()
+                sys.exit(0)
+                
+            print("Finished parsing successfuly.\n")
+
+        raw_input = getInput("Would you like to see the parsed files?", [validateBoolean])
+        print("")
+
+        if raw_input in ["y", "ye", "yes", "1"]:
+            for pop in pop_objs:
+                print(pop)
+                raw_input = input("Press enter to continue, or type end to stop viewing.\n")
+                if raw_input.lower() == "end":
+                    break
+
 
         os.chdir(script_path)
         if not savedir or not os.path.isdir(savedir):
@@ -1262,13 +1257,15 @@ try:
                                 if filename in os.listdir(os.getcwd()):
                                     texturename = getVMTTexture(filename)
                                 else:
-                                    os.chdir(tfdir + "\\materials\\hud")
-                                    if filename in os.listdir(os.getcwd()):
-                                        texturename = getVMTTexture(filename)
-                                    else:
-                                        os.chdir(tfdir + "\\download\\materials\\hud")
+                                    if os.path.isdir(tfdir + "\\materials\\hud"):
+                                        os.chdir(tfdir + "\\materials\\hud")
                                         if filename in os.listdir(os.getcwd()):
                                             texturename = getVMTTexture(filename)
+                                    else:
+                                        if os.path.isdir(tfdir + "\\download\\materials\\hud"):
+                                            os.chdir(tfdir + "\\download\\materials\\hud")
+                                            if filename in os.listdir(os.getcwd()):
+                                                texturename = getVMTTexture(filename)
 
                                     
                             os.chdir(script_path + "\\materials\\images")
