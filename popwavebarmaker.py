@@ -381,11 +381,11 @@ def createWaveScheduleBar(wave_icon_dicts, filename, totalcurrency_list, startin
     mission_name_size    = ImageDraw.Draw(Image.new("L", (1000, 300))).textsize(mission_name, fontlist["wavebartitlefont"])
     mission_name_padding = 10
 
-    startingcurrency_label   = "StartingCurrency : $" + str(startingcurrency)
+    startingcurrency_label   = "Starting Currency : $" + str(startingcurrency)
     startingcurrency_size    = ImageDraw.Draw(Image.new("L", (300, 300))).textsize(startingcurrency_label, fontlist["startingmoneyfont"])
     startingcurrency_padding = 10
 
-    totalcurrency_label   = "TotalCurrency : $" + str(startingcurrency + sum(totalcurrency_list))
+    totalcurrency_label   = "Total Currency : $" + str(startingcurrency + sum(totalcurrency_list))
     totalcurrency_size    = ImageDraw.Draw(Image.new("L", (300, 300))).textsize(totalcurrency_label, fontlist["totalmoneyfont"])
     totalcurrency_padding = 10
     
@@ -1256,16 +1256,16 @@ try:
                                 filename = "leaderboard_class_" + icon + ".vmt"
                                 if filename in os.listdir(os.getcwd()):
                                     texturename = getVMTTexture(filename)
-                                else:
-                                    if os.path.isdir(tfdir + "\\materials\\hud"):
-                                        os.chdir(tfdir + "\\materials\\hud")
-                                        if filename in os.listdir(os.getcwd()):
-                                            texturename = getVMTTexture(filename)
-                                    else:
-                                        if os.path.isdir(tfdir + "\\download\\materials\\hud"):
-                                            os.chdir(tfdir + "\\download\\materials\\hud")
-                                            if filename in os.listdir(os.getcwd()):
-                                                texturename = getVMTTexture(filename)
+
+                                if texturename == "debugempty" and os.path.isdir(tfdir + "\\materials\\hud"):
+                                    os.chdir(tfdir + "\\materials\\hud")
+                                    if filename in os.listdir(os.getcwd()):
+                                        texturename = getVMTTexture(filename)
+
+                                if texturename == "debugempty" and os.path.isdir(tfdir + "\\download\\materials\\hud"):
+                                    os.chdir(tfdir + "\\download\\materials\\hud")
+                                    if filename in os.listdir(os.getcwd()):
+                                        texturename = getVMTTexture(filename)
 
                                     
                             os.chdir(script_path + "\\materials\\images")
