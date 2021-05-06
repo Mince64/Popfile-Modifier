@@ -906,7 +906,7 @@ try:
                 tfdir = getInput("Enter the directory path of your tf folder.", [os.path.isdir])
                 print("")
 
-                if not tfdir.endswith("\\tf") or not tfdir.endswith("\\tf\\"):
+                if not tfdir.endswith("\\tf") and not tfdir.endswith("\\tf\\"):
                     if os.path.isdir(tfdir + "\\tf"):
                         tfdir += "\\tf"
                     else:
