@@ -683,7 +683,7 @@ def getTFBotIconString(tfbot, wave_icon_dict, templates, totalcount, support, no
     for icon, data in wave_icon_dict["normal"].items():
         if icon in newicons["giant"]:
             # Only stack if our hascrits are the same
-            if newicons["giant"][icon][1] and data[1]:
+            if newicons["giant"][icon][1] == data[1]:
                 newicons["giant"][icon] = [data[0] + newicons["giant"][icon][0], data[1] if data[1] else newicons["giant"][icon][1]]
                 del newicons["normal"][icon]
 
@@ -707,6 +707,8 @@ def getTankIconString(tank, wave_icon_dict, templates, totalcount, support):
         return
 
     classicon = None
+    miniboss  = True
+    hascrits  = False
 
     # test this
     template_stack = []
@@ -718,9 +720,13 @@ def getTankIconString(tank, wave_icon_dict, templates, totalcount, support):
         ignore_template = False
         
         for kv in current_template.keyvalues:
-            if not classicon and kv.equals(KeyValue("ClassIcon", None, flags="i")):
+            if not classicon and kv.equals(KeyValue("ClassIcon", None, flags="iq")):
                 classicon = kv.value
-            elif kv.equals(KeyValue("Template", None, flags="i")):
+            elif not hascrits and kv.equals(KeyValue("IsCrit", "1", flags="iq")):
+                hascrits = True
+            elif kv.equals(KeyValue("IsMiniBoss", "0", flags="iq")):
+                miniboss = False
+            elif not template and kv.equals(KeyValue("Template", None, flags="iq")):
                 if not ignore_template:
                     template = kv.value.lower()
                     ignore_template = True
@@ -750,14 +756,42 @@ def getTankIconString(tank, wave_icon_dict, templates, totalcount, support):
 
     if support:
         try:
-            wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, False]
+            # If one icon or the other has crits, don't stack and create a separate icon.
+            if wave_icon_dict["support"][classicon][1] ^ hascrits:
+                wave_icon_dict["support"][classicon + "\0"] = [totalcount, hascrits] # We'll deal with that null char later, this is just to seperate the two
+            else:
+                wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
         except KeyError:
-            wave_icon_dict["support"][classicon] = [totalcount, False]
+            wave_icon_dict["support"][classicon] = [totalcount, hascrits]
+    elif miniboss:
+        try:
+            if wave_icon_dict["giant"][classicon][1] ^ hascrits:
+                wave_icon_dict["giant"][classicon + "\0"] = [totalcount, hascrits]
+            else:
+                wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
+        except KeyError:
+            wave_icon_dict["giant"][classicon] = [totalcount, hascrits]
     else:
         try:
-            wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, False]
+            if wave_icon_dict["normal"][classicon][1] ^ hascrits:
+                wave_icon_dict["normal"][classicon + "\0"] = [totalcount, hascrits]
+            else:
+                wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
         except KeyError:
-            wave_icon_dict["giant"][classicon] = [totalcount, False]
+            wave_icon_dict["normal"][classicon] = [totalcount, hascrits]
+
+    # Simulate normal to giant icon stacking
+    newicons = copy.deepcopy(wave_icon_dict)
+                
+    for icon, data in wave_icon_dict["normal"].items():
+        if icon in newicons["giant"]:
+            # Only stack if our hascrits are the same
+            if newicons["giant"][icon][1] == data[1]:
+                newicons["giant"][icon] = [data[0] + newicons["giant"][icon][0], data[1] if data[1] else newicons["giant"][icon][1]]
+                del newicons["normal"][icon]
+
+    for group in wave_icon_dict.keys():
+        wave_icon_dict[group] = newicons[group]
 
 
 # Main loop
@@ -872,7 +906,7 @@ try:
                 tfdir = getInput("Enter the directory path of your tf folder.", [os.path.isdir])
                 print("")
 
-                if not tfdir.endswith("tf"):
+                if not tfdir.endswith("\\tf") or not tfdir.endswith("\\tf\\"):
                     if os.path.isdir(tfdir + "\\tf"):
                         tfdir += "\\tf"
                     else:
