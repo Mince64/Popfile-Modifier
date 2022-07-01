@@ -632,11 +632,11 @@ def getTFBotIconString(tfbot, wave_icon_dict, templates, totalcount, support, no
             else:
                 break
 
-    if not tfclass:
-        if notify_warnings:
-            print(f"WARNING: Invalid TFBot, bot has no class keyvalue. ({tfbot.name})")
-            print(tfbot)
-        classicon = "debugempty"
+    # if not tfclass:
+    #     if notify_warnings:
+    #         print(f"WARNING: Invalid TFBot, bot has no class keyvalue. ({tfbot.name})")
+    #         print(tfbot)
+    #     classicon = "debugempty"
 
     if not classicon:
         for cls, icon in default_classicons.items():
@@ -652,27 +652,17 @@ def getTFBotIconString(tfbot, wave_icon_dict, templates, totalcount, support, no
 
     if support:
         try:
-            # If one icon or the other has crits, don't stack and create a separate icon.
-            if wave_icon_dict["support"][classicon][1] ^ hascrits:
-                wave_icon_dict["support"][classicon + "\0"] = [totalcount, hascrits] # We'll deal with that null char later, this is just to seperate the two
-            else:
-                wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
+            wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
         except KeyError:
             wave_icon_dict["support"][classicon] = [totalcount, hascrits]
     elif miniboss:
         try:
-            if wave_icon_dict["giant"][classicon][1] ^ hascrits:
-                wave_icon_dict["giant"][classicon + "\0"] = [totalcount, hascrits]
-            else:
-                wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
+            wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
         except KeyError:
             wave_icon_dict["giant"][classicon] = [totalcount, hascrits]
     else:
         try:
-            if wave_icon_dict["normal"][classicon][1] ^ hascrits:
-                wave_icon_dict["normal"][classicon + "\0"] = [totalcount, hascrits]
-            else:
-                wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
+            wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
         except KeyError:
             wave_icon_dict["normal"][classicon] = [totalcount, hascrits]
 
@@ -756,27 +746,17 @@ def getTankIconString(tank, wave_icon_dict, templates, totalcount, support):
 
     if support:
         try:
-            # If one icon or the other has crits, don't stack and create a separate icon.
-            if wave_icon_dict["support"][classicon][1] ^ hascrits:
-                wave_icon_dict["support"][classicon + "\0"] = [totalcount, hascrits] # We'll deal with that null char later, this is just to seperate the two
-            else:
-                wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
+            wave_icon_dict["support"][classicon] = [wave_icon_dict["support"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["support"][classicon][1]]
         except KeyError:
             wave_icon_dict["support"][classicon] = [totalcount, hascrits]
     elif miniboss:
         try:
-            if wave_icon_dict["giant"][classicon][1] ^ hascrits:
-                wave_icon_dict["giant"][classicon + "\0"] = [totalcount, hascrits]
-            else:
-                wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
+            wave_icon_dict["giant"][classicon] = [wave_icon_dict["giant"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["giant"][classicon][1]]
         except KeyError:
             wave_icon_dict["giant"][classicon] = [totalcount, hascrits]
     else:
         try:
-            if wave_icon_dict["normal"][classicon][1] ^ hascrits:
-                wave_icon_dict["normal"][classicon + "\0"] = [totalcount, hascrits]
-            else:
-                wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
+            wave_icon_dict["normal"][classicon] = [wave_icon_dict["normal"][classicon][0] + totalcount, hascrits if hascrits else wave_icon_dict["normal"][classicon][1]]
         except KeyError:
             wave_icon_dict["normal"][classicon] = [totalcount, hascrits]
 
@@ -1252,7 +1232,7 @@ try:
                     with open(filename, "r") as file:
                         for line in file:
                             terms = parseLineTerms(line)
-                            if '"$basetexture"' in map(lambda term: term.lower(), terms):
+                            if '"$basetexture"' or "$basetexture" in map(lambda term: term.lower(), terms):
                                 for term in terms:
                                     if "leaderboard_class_" in term.lower():                               
                                         index = -1
@@ -1343,4 +1323,3 @@ except:
         print(val)
     input()
     sys.exit(0)
-
